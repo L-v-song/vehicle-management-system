@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>园区后台管理系统</title>
+<style>
+  /* ============ 简约配色：一个主色 + 中性灰 ============ */
+  :root {
+    --primary: #2b6cb0;
+    --primary-dark: #24598f;
+    --text: #333;
+    --text-sub: #888;
+    --line: #e6e8eb;
+    --bg: #f5f6f7;
+    --panel: #fff;
+    --ok: #1e7e34;
+    --ok-bg: #eef6ef;
+    --over: #a94442;
+    --over-bg: #faf0f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* ===== 布局 ===== */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 190px; background: #24272e; flex-shrink: 0; transition: width .2s; overflow: hidden; }
+  .sidebar.collapsed { width: 56px; }
+  .logo { height: 56px; display: flex; align-items: center; padding-left: 18px; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: .5px; border-bottom: 1px solid rgba(255,255,255,.08); white-space: nowrap; }
+  .sidebar.collapsed .logo span { display: none; }
+  .sidebar.collapsed .logo::after { content: "园"; color: #fff; }
+  .menu { list-style: none; padding: 10px 0; }
+  .menu li a { display: block; padding: 12px 18px; color: #b9bec7; font-size: 14px; white-space: nowrap; cursor: pointer; border-left: 3px solid transparent; }
+  .menu li a:hover { color: #fff; background: rgba(255,255,255,.05); }
+  .menu li a.active { color: #fff; background: rgba(43,108,176,.28); border-left-color: var(--primary); }
+
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .topbar { height: 56px; background: var(--panel); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--line); }
+  .topbar .left { display: flex; align-items: center; gap: 14px; }
+  .fold-btn { cursor: pointer; color: var(--text-sub); font-size: 16px; user-select: none; }
+  .fold-btn:hover { color: var(--text); }
+  .page-title { font-size: 15px; }
+  .user { color: var(--text-sub); font-size: 13px; }
+  .content { padding: 20px; }
+
+  .page { display: none; }
+  .page.show { display: block; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+
+  /* ===== 工作台 ===== */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+  .stat-card { padding: 16px 18px; }
+  .stat-card .s-label { font-size: 13px; color: var(--text-sub); margin-bottom: 8px; }
+  .stat-card .s-value { font-size: 24px; font-weight: 600; }
+  .block-title { font-size: 14px; font-weight: 600; margin: 0 0 10px 2px; color: #444; }
+  .quick-row { margin-bottom: 18px; }
+  .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .quick-item { padding: 16px 10px; text-align: center; color: #555; cursor: pointer; border-right: 1px solid var(--line); }
+  .quick-item:last-child { border-right: none; }
+  .quick-item:hover { background: #fafbfc; color: var(--primary); }
+  .recent-list { padding: 4px 16px; }
+  .recent-list .r-line { padding: 10px 2px; border-bottom: 1px dashed var(--line); font-size: 13px; color: #555; }
+  .recent-list .r-line:last-child { border-bottom: none; }
+  .empty-tip { color: #bbb; text-align: center; padding: 26px 0; font-size: 13px; }
+
+  /* ===== 工具栏 ===== */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; margin-bottom: 14px; align-items: center; }
+  .toolbar input, .toolbar select { height: 32px; padding: 0 8px; border: 1px solid #d5d8dc; border-radius: 3px; outline: none; font-size: 13px; color: var(--text); background: #fff; }
+  .toolbar input:focus, .toolbar select:focus { border-color: var(--primary); }
+  .btn { height: 32px; padding: 0 14px; border: 1px solid transparent; border-radius: 3px; font-size: 13px; cursor: pointer; background: var(--primary); color: #fff; }
+  .btn:hover { background: var(--primary-dark); }
+  .btn.ghost { background: #fff; color: #555; border-color: #d5d8dc; }
+  .btn.ghost:hover { background: #fafbfc; color: var(--text); }
+  .btn.danger { background: #fff; color: var(--over); border-color: #e3c6c6; }
+  .btn.danger:hover { background: var(--over-bg); }
+  .spacer { flex: 1; }
+
+  /* ===== 表格 ===== */
+  .table-card { overflow: hidden; }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.grid th, table.grid td { padding: 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.grid thead { background: #fafbfc; }
+  table.grid th { font-weight: 600; color: #555; }
+  table.grid tbody tr:hover { background: #fafbfc; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 2px; font-size: 12px; }
+  .tag.ok { color: var(--ok); background: var(--ok-bg); }
+  .tag.over { color: var(--over); background: var(--over-bg); }
+  .ops a { color: var(--primary); margin-right: 10px; cursor: pointer; }
+  .ops a:hover { text-decoration: underline; }
+  .page-bar { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 12px 14px; font-size: 13px; color: var(--text-sub); }
+  .page-bar .pbtn { min-width: 28px; height: 28px; padding: 0 8px; border: 1px solid #d5d8dc; background: #fff; border-radius: 3px; cursor: pointer; font-size: 13px; color: #555; }
+  .page-bar .pbtn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  .page-bar .pbtn:disabled { color: #ccc; cursor: not-allowed; }
+  .page-bar .pbtn.cur { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  /* ===== 弹窗 ===== */
+  .mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 999; }
+  .mask.show { display: flex; align-items: center; justify-content: center; }
+  .dialog { width: 520px; max-width: 92%; background: #fff; border-radius: 4px; max-height: 90vh; overflow: auto; }
+  .dialog .d-head { padding: 14px 20px; font-size: 15px; font-weight: 600; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .dialog .d-close { cursor: pointer; color: #aaa; font-size: 15px; }
+  .dialog .d-close:hover { color: #555; }
+  .dialog .d-body { padding: 20px; }
+  .dialog .d-foot { padding: 12px 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+  .dl-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .f-item { display: flex; flex-direction: column; gap: 6px; }
+  .f-item label { font-size: 13px; color: #666; }
+  .f-item input, .f-item select { height: 32px; border: 1px solid #d5d8dc; border-radius: 3px; padding: 0 8px; font-size: 13px; outline: none; color: var(--text); background: #fff; }
+  .f-item input:focus, .f-item select:focus { border-color: var(--primary); }
+  .f-item input[readonly], .f-item select:disabled { background: #f7f8f9; color: #999; }
+
+  /* ===== 增加/编辑月卡 ===== */
+  .page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .page-head h2 { font-size: 16px; font-weight: 600; }
+  .add-card { margin-bottom: 14px; }
+  .add-card h3 { font-size: 14px; font-weight: 600; padding: 13px 20px; border-bottom: 1px solid var(--line); color: #444; }
+  .add-form { padding: 18px 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .tip { color: #999; font-size: 12px; padding: 0 20px; }
+  .err { color: var(--over); font-size: 12px; min-height: 16px; }
+  .foot-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- 左侧菜单 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo"><span>园区后台管理系统</span></div>
+    <ul class="menu">
+      <li><a data-hash="#/home" class="menu-link active">工作台</a></li>
+      <li><a data-hash="#/list" class="menu-link">月卡管理</a></li>
+      <li><a data-hash="#/add" class="menu-link">增加月卡</a></li>
+      <li><a data-hash="#/home" class="menu-link">企业管理</a></li>
+      <li><a data-hash="#/home" class="menu-link">员工管理</a></li>
+      <li><a data-hash="#/home" class="menu-link">数据看板</a></li>
+    </ul>
+  </aside>
+
+  <!-- 右侧主区域 -->
+  <div class="main">
+    <div class="topbar">
+      <div class="left">
+        <span class="fold-btn" id="foldBtn">☰</span>
+        <span class="page-title" id="pageTitle">工作台</span>
+      </div>
+      <div class="user">管理员</div>
+    </div>
+
+    <div class="content">
+      <!-- ========== 页面1：工作台首页 index ========== -->
+      <section class="page" id="page-home">
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="quick-row">
+          <div class="block-title">快捷入口</div>
+          <div class="quick-grid card">
+            <div class="quick-item" data-goto="#/add">增加月卡</div>
+            <div class="quick-item" data-goto="#/list">月卡管理</div>
+            <div class="quick-item" data-goto="#/home">企业管理</div>
+            <div class="quick-item" data-goto="#/home">数据看板</div>
+          </div>
+        </div>
+        <div class="recent-row">
+          <div class="block-title">最新月卡动态</div>
+          <div class="card recent-list" id="recentBox"><div class="empty-tip">暂无数据</div></div>
+        </div>
+      </section>
+
+      <!-- ========== 页面2：月卡管理列表 monthCard ========== -->
+      <section class="page" id="page-list">
+        <div class="toolbar card">
+          <input type="text" id="kw" placeholder="车主姓名 / 手机号 / 车牌" style="width:190px">
+          <select id="fStatus">
+            <option value="">全部状态</option>
+            <option value="可用">可用</option>
+            <option value="已过期">已过期</option>
+          </select>
+          <select id="fBrand">
+            <option value="">全部品牌</option>
+            <option value="大众">大众</option>
+            <option value="丰田">丰田</option>
+            <option value="本田">本田</option>
+            <option value="比亚迪">比亚迪</option>
+            <option value="吉利">吉利</option>
+          </select>
+          <button class="btn" id="btnSearch">查询</button>
+          <button class="btn ghost" id="btnReset">重置</button>
+          <div class="spacer"></div>
+          <button class="btn" id="btnAdd">添加月卡</button>
+          <button class="btn danger" id="btnBatchDel">批量删除</button>
+        </div>
+        <div class="card table-card">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th style="width:38px"><input type="checkbox" id="checkAll"></th>
+                <th>序号</th><th>车主姓名</th><th>联系方式</th><th>车牌号码</th><th>车辆品牌</th>
+                <th>开始日期</th><th>结束日期</th><th>缴费金额</th><th>支付方式</th><th>剩余天数</th><th>状态</th>
+                <th style="width:140px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+          <div class="page-bar" id="pageBar"></div>
+        </div>
+      </section>
+
+      <!-- ========== 页面3：增加/编辑月卡 addMonthCard ========== -->
+      <section class="page" id="page-add">
+        <div class="page-head">
+          <button class="btn ghost" id="btnBack">返回</button>
+          <h2 id="addTitle">增加月卡</h2>
+        </div>
+        <div class="card add-card">
+          <h3>车辆信息</h3>
+          <div class="add-form">
+            <div class="f-item">
+              <label>车主姓名</label>
+              <input type="text" id="ownerName" placeholder="请输入车主姓名">
+              <span class="err" data-err="ownerName"></span>
+            </div>
+            <div class="f-item">
+              <label>联系方式</label>
+              <input type="text" id="phone" placeholder="请输入 11 位手机号">
+              <span class="err" data-err="phone"></span>
+            </div>
+            <div class="f-item">
+              <label>车牌号码</label>
+              <input type="text" id="plate" placeholder="如：京A12345">
+              <span class="err" data-err="plate"></span>
+            </div>
+            <div class="f-item">
+              <label>车辆品牌</label>
+              <input type="text" id="brand" placeholder="如：大众">
+              <span class="err" data-err="brand"></span>
+            </div>
+          </div>
+        </div>
+        <div class="card add-card">
+          <h3>缴费信息</h3>
+          <div class="add-form">
+            <div class="f-item">
+              <label>开始日期</label>
+              <input type="date" id="startDate">
+            </div>
+            <div class="f-item">
+              <label>结束日期</label>
+              <input type="date" id="endDate">
+              <span class="err" data-err="date"></span>
+            </div>
+            <div class="f-item">
+              <label>支付金额（元）</label>
+              <input type="number" id="amount" placeholder="请输入缴费金额">
+              <span class="err" data-err="amount"></span>
+            </div>
+            <div class="f-item">
+              <label>支付方式</label>
+              <select id="payType">
+                <option value="微信">微信</option>
+                <option value="支付宝">支付宝</option>
+                <option value="现金">现金</option>
+              </select>
+            </div>
+            <div class="f-item">
+              <label>剩余有效天数（自动计算）</label>
+              <input type="text" id="remainDay" readonly>
+            </div>
+            <div class="f-item">
+              <label>状态（自动判断）</label>
+              <input type="text" id="status" readonly>
+            </div>
+          </div>
+          <div style="padding-bottom: 12px;"><span class="tip">提示：结束日期小于今天则自动标记为"已过期"。</span></div>
+        </div>
+        <div class="foot-btns">
+          <button class="btn ghost" id="btnResetForm">重置</button>
+          <button class="btn" id="btnSave">确定</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 查看 / 编辑 / 续费 共用弹窗 ===== -->
+<div class="mask" id="dialogMask">
+  <div class="dialog">
+    <div class="d-head"><span id="dlTitle">查看月卡</span><span class="d-close" id="dlClose">✕</span></div>
+    <div class="d-body">
+      <div class="dl-form">
+        <div class="f-item"><label>车主姓名</label><input id="dl_ownerName"></div>
+        <div class="f-item"><label>联系方式</label><input id="dl_phone"></div>
+        <div class="f-item"><label>车牌号码</label><input id="dl_plate"></div>
+        <div class="f-item"><label>车辆品牌</label><input id="dl_brand"></div>
+        <div class="f-item"><label>开始日期</label><input id="dl_startDate" type="date"></div>
+        <div class="f-item"><label>结束日期</label><input id="dl_endDate" type="date"></div>
+        <div class="f-item"><label>支付金额（元）</label><input id="dl_amount"></div>
+        <div class="f-item"><label>支付方式</label><select id="dl_payType"><option>微信</option><option>支付宝</option><option>现金</option></select></div>
+        <div class="f-item"><label>剩余有效天数</label><input id="dl_remainDay" readonly></div>
+        <div class="f-item"><label>状态</label><input id="dl_status" readonly></div>
+      </div>
+    </div>
+    <div class="d-foot">
+      <button class="btn ghost" id="dlCancel">取消</button>
+      <button class="btn" id="dlOk" style="display:none">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+ * 园区后台管理系统 —— 原生 HTML + CSS + JavaScript 实现
+ * 数据源：浏览器本地存储 localStorage，key = monthCardData
+ * 分层：常量 / 工具 / 数据 / 渲染 / 交互
+ * ===================================================================== */
+(function () {
+  'use strict';
+
+  /* ---------- 1. 常量 ---------- */
+  const STORAGE_KEY = 'monthCardData';
+  const PAGE_SIZE = 5;
+
+  const PHONE_REG = /^1[3-9]\d{9}$/;
+  // 省简称 + 字母 + 5~6 位，末位允许特殊号牌（挂学警港澳）
+  const PLATE_REG = /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-HJ-NP-Z][A-HJ-NP-Z0-9]{4,5}[A-HJ-NP-Z0-9挂学警港澳]$/;
+
+  // 弹窗表单字段：可编辑项 与 恒只读项，只读切换时统一处理，避免多处重复
+  const DIALOG_EDITABLE = ['dl_ownerName', 'dl_phone', 'dl_plate', 'dl_brand', 'dl_startDate', 'dl_endDate', 'dl_amount'];
+  const DIALOG_READONLY = ['dl_remainDay', 'dl_status'];
+  // 续费时需要锁定的车辆信息字段
+  const RENEW_LOCKED = ['dl_ownerName', 'dl_phone', 'dl_plate', 'dl_brand'];
+
+  const ADD_FIELDS = ['ownerName', 'phone', 'plate', 'brand', 'startDate', 'endDate', 'amount'];
+  const PAGE_TITLE = { '#/home': '工作台', '#/list': '月卡管理', '#/add': '增加月卡' };
+  const STATUS = { OK: '可用', OVER: '已过期' };
+
+  /* ---------- 2. DOM 与工具 ---------- */
+  const $ = id => document.getElementById(id);
+  const $$ = sel => document.querySelectorAll(sel);
+
+  // 本地日期格式化：toISOString() 会转成 UTC，东八区会差一天，这里按本地时间拼
+  function fmtDate(date) {
+    const pad = n => (n < 10 ? '0' + n : '' + n);
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+  }
+  function todayStr() { return fmtDate(new Date()); }
+  function dateOffset(days) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return fmtDate(d);
+  }
+  function parseDate(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  // 剩余有效天数 = 结束日期 - 今天，向上取整，小于 0 按 0 计
+  function calcRemain(endDate) {
+    if (!endDate) return 0;
+    const diff = Math.ceil((parseDate(endDate) - parseDate(todayStr())) / 86400000);
+    return diff > 0 ? diff : 0;
+  }
+  function calcStatus(endDate) {
+    return calcRemain(endDate) > 0 ? STATUS.OK : STATUS.OVER;
+  }
+
+  // 渲染前转义，避免用户输入被当成 HTML 执行
+  function escapeHtml(value) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(value == null ? '' : value).replace(/[&<>"']/g, ch => map[ch]);
+  }
+
+  /* ---------- 3. 数据层 ---------- */
+  // 首次打开时的默认模拟数据
+  function defaultData() {
+    const rows = [
+      ['张三', '13800138001', '京A12345', '大众',   -300, 365, 1200, '微信'],
+      ['李四', '13900139002', '沪B23456', '丰田',    -60, 180,  600, '支付宝'],
+      ['王五', '13700137003', '粤B34567', '本田',   -800,  90,  300, '现金'],
+      ['赵六', '13600136004', '苏E45678', '比亚迪',  -30, 720, 2400, '微信'],
+      ['钱七', '13500135005', '浙A56789', '大众',   -200,  30,  200, '微信'],
+      ['孙八', '13400134006', '川A67890', '吉利',   -400, -10, 1000, '支付宝']
+    ];
+    return rows.map((r, i) => {
+      const card = {
+        id: i + 1, ownerName: r[0], phone: r[1], plate: r[2], brand: r[3],
+        startDate: dateOffset(r[4]), endDate: dateOffset(r[5]),
+        amount: r[6], payType: r[7]
+      };
+      card.remainDay = calcRemain(card.endDate);
+      card.status = calcStatus(card.endDate);
+      return card;
+    });
+  }
+
+  // 读取数据；本机存储没有或损坏时回落到默认数据
+  function loadData() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const init = defaultData();
+      saveData(init);
+      return init;
+    }
+    try {
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) throw new Error('数据格式不正确');
+      // 日期会随时间推移变化，回读时重新计算天数与状态，不能存死
+      list.forEach(c => {
+        c.remainDay = calcRemain(c.endDate);
+        c.status = calcStatus(c.endDate);
+      });
+      return list;
+    } catch (e) {
+      const init = defaultData();
+      saveData(init);
+      return init;
+    }
+  }
+
+  function saveData(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      return true;
+    } catch (e) {
+      alert('数据保存失败，可能是浏览器存储空间已满');
+      return false;
+    }
+  }
+
+  /* ---------- 4. hash 路由 ---------- */
+  const state = { page: 1, keyword: '', status: '', brand: '', editId: null, dialogId: null, dialogMode: 'view' };
+
+  function parseHash() {
+    const raw = location.hash || '#/home';
+    const [path, query] = raw.split('?');
+    return { path, params: new URLSearchParams(query || '') };
+  }
+
+  function route() {
+    const { path, params } = parseHash();
+    $$('.page').forEach(el => el.classList.remove('show'));
+    $$('.menu-link').forEach(el => el.classList.toggle('active', el.dataset.hash === path));
+    $('pageTitle').textContent = PAGE_TITLE[path] || PAGE_TITLE['#/home'];
+
+    if (path === '#/list') {
+      resetFilters();
+      $('page-list').classList.add('show');
+      renderTable();
+    } else if (path === '#/add') {
+      $('page-add').classList.add('show');
+      initAddPage(params.get('id'));
+    } else {
+      $('page-home').classList.add('show');
+      renderHome();
+    }
+  }
+
+  /* ---------- 5. 工作台 ---------- */
+  function renderHome() {
+    const list = loadData();
+    const usable = list.filter(c => c.status === STATUS.OK).length;
+    // 收费、企业数、一体杆数为演示用的固定值，真实项目应由后端统计
+    const cards = [
+      { label: '年度累计收费（元）', value: '56,233' },
+      { label: '入驻企业总数（个）', value: '6' },
+      { label: '月卡车辆总数（辆）', value: list.length + ' / ' + usable + ' 可用' },
+      { label: '一体杆总数（台）', value: '48' }
+    ];
+    $('statGrid').innerHTML = cards.map(c =>
+      '<div class="card stat-card"><div class="s-label">' + c.label + '</div>' +
+      '<div class="s-value">' + c.value + '</div></div>'
+    ).join('');
+
+    const recent = list.slice(-3).reverse();
+    $('recentBox').innerHTML = recent.length
+      ? recent.map(c => {
+        const tip = c.status === STATUS.OK ? '剩余 ' + c.remainDay + ' 天' : STATUS.OVER;
+        return '<div class="r-line">' + escapeHtml(c.ownerName) + '（' + escapeHtml(c.plate) + '） · 有效期至 ' + c.endDate + ' · ' + tip + '</div>';
+      }).join('')
+      : '<div class="empty-tip">暂无数据</div>';
+  }
+
+  /* ---------- 6. 月卡列表 ---------- */
+  function filterData(list) {
+    const { keyword, status, brand } = state;
+    return list.filter(c => {
+      const hitKeyword = !keyword || c.ownerName.indexOf(keyword) >= 0 || c.phone.indexOf(keyword) >= 0 || c.plate.indexOf(keyword) >= 0;
+      const hitStatus = !status || c.status === status;
+      const hitBrand = !brand || c.brand === brand;
+      return hitKeyword && hitStatus && hitBrand;
+    });
+  }
+
+  function resetFilters() {
+    state.keyword = ''; state.status = ''; state.brand = ''; state.page = 1;
+    $('kw').value = ''; $('fStatus').value = ''; $('fBrand').value = '';
+  }
+
+  function renderTable() {
+    const filtered = filterData(loadData());
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (state.page > totalPages) state.page = totalPages;
+    const start = (state.page - 1) * PAGE_SIZE;
+    const rows = filtered.slice(start, start + PAGE_SIZE);
+
+    $('tbody').innerHTML = rows.length
+      ? rows.map((c, i) => {
+        const tag = c.status === STATUS.OK ? 'ok' : 'over';
+        return '<tr>' +
+          '<td><input type="checkbox" class="row-check" value="' + c.id + '"></td>' +
+          '<td>' + (start + i + 1) + '</td>' +
+          '<td>' + escapeHtml(c.ownerName) + '</td>' +
+          '<td>' + escapeHtml(c.phone) + '</td>' +
+          '<td>' + escapeHtml(c.plate) + '</td>' +
+          '<td>' + escapeHtml(c.brand) + '</td>' +
+          '<td>' + c.startDate + '</td><td>' + c.endDate + '</td>' +
+          '<td>' + c.amount + '</td><td>' + escapeHtml(c.payType) + '</td>' +
+          '<td>' + c.remainDay + '</td>' +
+          '<td><span class="tag ' + tag + '">' + c.status + '</span></td>' +
+          '<td class="ops">' +
+            '<a data-op="renew" data-id="' + c.id + '">续费</a>' +
+            '<a data-op="view" data-id="' + c.id + '">查看</a>' +
+            '<a data-op="edit" data-id="' + c.id + '">编辑</a>' +
+            '<a data-op="del" data-id="' + c.id + '">删除</a>' +
+          '</td></tr>';
+      }).join('')
+      : '<tr><td colspan="13" style="text-align:center;color:#bbb;padding:28px 0;">没有符合条件的月卡记录</td></tr>';
+
+    renderPager(totalPages, filtered.length);
+    $('checkAll').checked = false;
+  }
+
+  function renderPager(totalPages, totalCount) {
+    let html = '<span>共 ' + totalCount + ' 条 · ' + state.page + ' / ' + totalPages + ' 页</span>';
+    html += '<button class="pbtn" data-pg="prev"' + (state.page <= 1 ? ' disabled' : '') + '>上一页</button>';
+    for (let p = 1; p <= totalPages; p++) {
+      html += '<button class="pbtn' + (p === state.page ? ' cur' : '') + '" data-pg="' + p + '">' + p + '</button>';
+    }
+    html += '<button class="pbtn" data-pg="next"' + (state.page >= totalPages ? ' disabled' : '') + '>下一页</button>';
+    $('pageBar').innerHTML = html;
+  }
+
+  // 事件委托：翻页按钮只绑一次，靠 data-pg 分发
+  $('pageBar').addEventListener('click', e => {
+    const btn = e.target.closest('.pbtn');
+    if (!btn || btn.disabled) return;
+    const pg = btn.dataset.pg;
+    const totalPages = Math.max(1, Math.ceil(filterData(loadData()).length / PAGE_SIZE));
+    if (pg === 'prev') state.page = Math.max(1, state.page - 1);
+    else if (pg === 'next') state.page = Math.min(totalPages, state.page + 1);
+    else state.page = Number(pg);
+    renderTable();
+  });
+
+  // 事件委托：行操作与复选框都在 tbody 上监听一次，不用每渲染一行绑一遍
+  $('tbody').addEventListener('click', e => {
+    const link = e.target.closest('a[data-op]');
+    if (!link) return;
+    const card = loadData().find(c => c.id === Number(link.dataset.id));
+    // 回调执行时 openView 等常量均已初始化，可安全分发
+    const action = { view: openView, edit: openEdit, renew: openRenew, del: delOne }[link.dataset.op];
+    if (card && action) action(card);
+  });
+  $('tbody').addEventListener('change', e => {
+    if (e.target.classList.contains('row-check')) syncCheckAll();
+  });
+
+  function syncCheckAll() {
+    const boxes = Array.from($$('.row-check'));
+    $('checkAll').checked = boxes.length > 0 && boxes.every(cb => cb.checked);
+  }
+
+  $('checkAll').addEventListener('change', function () {
+    $$('.row-check').forEach(cb => { cb.checked = this.checked; });
+  });
+
+  $('btnBatchDel').addEventListener('click', () => {
+    const ids = Array.from($$('.row-check:checked')).map(cb => Number(cb.value));
+    if (!ids.length) { alert('请先勾选要删除的月卡'); return; }
+    if (!confirm('确定删除选中的 ' + ids.length + ' 条月卡吗？')) return;
+    saveData(loadData().filter(c => ids.indexOf(c.id) < 0));
+    renderTable();
+  });
+
+  $('btnSearch').addEventListener('click', () => {
+    state.keyword = $('kw').value.trim();
+    state.status = $('fStatus').value;
+    state.brand = $('fBrand').value;
+    state.page = 1;
+    renderTable();
+  });
+  $('btnReset').addEventListener('click', () => {
+    resetFilters();
+    renderTable();
+  });
+  $('btnAdd').addEventListener('click', () => { location.hash = '#/add'; });
+
+  /* ---------- 7. 弹窗：查看 / 编辑 / 续费 共用一套表单 ---------- */
+  function showDialog() { $('dialogMask').classList.add('show'); }
+  function hideDialog() { $('dialogMask').classList.remove('show'); }
+
+  // 只读切换：可编辑字段随模式变化，剩余天数与状态恒为只读；select 不支持 readonly，用 disabled
+  function setDialogEditable(editable) {
+    DIALOG_EDITABLE.forEach(id => {
+      if (editable) $(id).removeAttribute('readonly');
+      else $(id).setAttribute('readonly', '');
+    });
+    DIALOG_READONLY.forEach(id => $(id).setAttribute('readonly', ''));
+    $('dl_payType').disabled = !editable;
+  }
+
+  function fillDialog(card) {
+    $('dl_ownerName').value = card.ownerName;
+    $('dl_phone').value = card.phone;
+    $('dl_plate').value = card.plate;
+    $('dl_brand').value = card.brand;
+    $('dl_startDate').value = card.startDate;
+    $('dl_endDate').value = card.endDate;
+    $('dl_amount').value = card.amount;
+    $('dl_payType').value = card.payType;
+    $('dl_remainDay').value = card.remainDay;
+    $('dl_status').value = card.status;
+  }
+
+  const DIALOG_TITLE = { view: '查看月卡', edit: '编辑月卡', renew: '月卡续费' };
+
+  function openDialog(card, mode) {
+    state.dialogId = card.id;
+    state.dialogMode = mode;
+    fillDialog(card);
+    setDialogEditable(mode !== 'view');
+
+    if (mode === 'renew') {
+      // 续费只允许改缴费信息，车辆信息锁定；日期默认顺延一年
+      RENEW_LOCKED.forEach(id => $(id).setAttribute('readonly', ''));
+      const nextYear = new Date();
+      nextYear.setFullYear(nextYear.getFullYear() + 1);
+      $('dl_startDate').value = todayStr();
+      $('dl_endDate').value = fmtDate(nextYear);
+      $('dl_remainDay').value = calcRemain(fmtDate(nextYear));
+      $('dl_status').value = STATUS.OK;
+    }
+
+    $('dlTitle').textContent = DIALOG_TITLE[mode];
+    $('dlOk').style.display = mode === 'view' ? 'none' : '';
+    showDialog();
+  }
+  const openView = card => openDialog(card, 'view');
+  const openEdit = card => openDialog(card, 'edit');
+  const openRenew = card => openDialog(card, 'renew');
+
+  function dialogOk() {
+    const values = {
+      ownerName: $('dl_ownerName').value.trim(),
+      phone: $('dl_phone').value.trim(),
+      plate: $('dl_plate').value.trim(),
+      brand: $('dl_brand').value.trim(),
+      startDate: $('dl_startDate').value,
+      endDate: $('dl_endDate').value,
+      amount: $('dl_amount').value,
+      payType: $('dl_payType').value
+    };
+    if (!values.ownerName || !values.phone || !values.plate || !values.startDate || !values.endDate || values.amount === '') {
+      alert('请填写完整信息'); return;
+    }
+    if (!PHONE_REG.test(values.phone)) { alert('手机号格式不正确'); return; }
+    if (!PLATE_REG.test(values.plate)) { alert('车牌格式不正确'); return; }
+    if (values.endDate < values.startDate) { alert('结束日期不能早于开始日期'); return; }
+
+    const list = loadData();
+    const idx = list.findIndex(c => c.id === state.dialogId);
+    if (idx < 0) { alert('未找到对应月卡记录'); return; }
+
+    list[idx] = Object.assign({}, list[idx], toCard(values));
+    saveData(list);
+    hideDialog();
+    renderTable();
+  }
+
+  // 表单值 → 月卡记录（补上自动计算的字段）
+  function toCard(values) {
+    return {
+      ownerName: values.ownerName,
+      phone: values.phone,
+      plate: values.plate,
+      brand: values.brand,
+      startDate: values.startDate,
+      endDate: values.endDate,
+      amount: Number(values.amount),
+      payType: values.payType,
+      remainDay: calcRemain(values.endDate),
+      status: calcStatus(values.endDate)
+    };
+  }
+
+  function delOne(card) {
+    if (!confirm('确定删除车主 ' + card.ownerName + '（' + card.plate + '）的月卡吗？')) return;
+    saveData(loadData().filter(c => c.id !== card.id));
+    renderTable();
+  }
+
+  $('dlClose').addEventListener('click', hideDialog);
+  $('dlCancel').addEventListener('click', hideDialog);
+  $('dlOk').addEventListener('click', dialogOk);
+  $('dialogMask').addEventListener('click', e => { if (e.target === e.currentTarget) hideDialog(); });
+
+  /* ---------- 8. 增加 / 编辑月卡页 ---------- */
+  function initAddPage(urlId) {
+    state.editId = urlId ? Number(urlId) : null;
+    $('addTitle').textContent = state.editId ? '编辑月卡' : '增加月卡';
+    clearErrors();
+    if (!state.editId) { clearAddForm(); return; }
+    const card = loadData().find(c => c.id === state.editId);
+    if (!card) { clearAddForm(); return; }
+    ADD_FIELDS.forEach(id => { $(id).value = card[id]; });
+    $('payType').value = card.payType;
+    $('remainDay').value = card.remainDay;
+    $('status').value = card.status;
+  }
+
+  function clearAddForm() {
+    ADD_FIELDS.forEach(id => { $(id).value = ''; });
+    $('payType').value = '微信';
+    $('remainDay').value = '';
+    $('status').value = '';
+    clearErrors();
+  }
+  function clearErrors() { $$('.err').forEach(el => { el.textContent = ''; }); }
+
+  $('btnResetForm').addEventListener('click', () => {
+    if (state.editId) initAddPage(state.editId);
+    else clearAddForm();
+  });
+  $('btnBack').addEventListener('click', () => { location.hash = '#/list'; });
+
+  // 输入日期后自动算剩余天数与状态
+  function syncDateTip() {
+    const start = $('startDate').value;
+    const end = $('endDate').value;
+    const valid = start && end && end >= start;
+    $('remainDay').value = valid ? calcRemain(end) : '';
+    $('status').value = valid ? calcStatus(end) : '';
+  }
+  $('startDate').addEventListener('change', syncDateTip);
+  $('endDate').addEventListener('change', syncDateTip);
+
+  // 校验：返回错误信息对象，空字符串表示该项通过
+  function validate(values) {
+    return {
+      ownerName: values.ownerName ? '' : '车主姓名不能为空',
+      phone: !values.phone ? '请输入手机号' : (PHONE_REG.test(values.phone) ? '' : '请输入正确的 11 位手机号'),
+      plate: !values.plate ? '请输入车牌号' : (PLATE_REG.test(values.plate) ? '' : '车牌格式错误'),
+      brand: values.brand ? '' : '车辆品牌不能为空',
+      amount: values.amount === '' ? '请输入缴费金额' : (Number(values.amount) > 0 ? '' : '金额必须大于 0'),
+      date: (values.startDate && values.endDate && values.endDate >= values.startDate) ? '' : '结束日期不能早于开始日期'
+    };
+  }
+  // 错误提示写到对应输入框下方的 span 上
+  function showErrors(errors) {
+    let pass = true;
+    Object.keys(errors).forEach(key => {
+      const box = document.querySelector('[data-err="' + key + '"]');
+      if (box) box.textContent = errors[key];
+      if (errors[key]) pass = false;
+    });
+    return pass;
+  }
+
+  $('btnSave').addEventListener('click', () => {
+    const values = {};
+    ADD_FIELDS.forEach(id => { values[id] = $(id).value.trim(); });
+    values.payType = $('payType').value;
+
+    if (!showErrors(validate(values))) return;
+
+    const list = loadData();
+    const idx = state.editId ? list.findIndex(c => c.id === state.editId) : -1;
+    if (idx >= 0) list[idx] = Object.assign({}, list[idx], toCard(values));
+    else list.push(Object.assign({ id: Date.now() }, toCard(values))); // Date.now() 生成唯一 id
+
+    saveData(list);
+    alert('保存成功');
+    location.hash = '#/list';
+  });
+
+  /* ---------- 9. 侧栏折叠与启动 ---------- */
+  $('foldBtn').addEventListener('click', () => {
+    $('sidebar').classList.toggle('collapsed');
+  });
+
+  window.addEventListener('hashchange', route);
+  route();
+})();
+
+</script>
+</body>
+</html>
