@@ -133,12 +133,12 @@
   <aside class="sidebar" id="sidebar">
     <div class="logo"><span>车辆管理系统</span></div>
     <ul class="menu">
-      <li><a data-hash="#/home" class="menu-link active">工作台</a></li>
-      <li><a data-hash="#/list" class="menu-link">月卡管理</a></li>
-      <li><a data-hash="#/add" class="menu-link">增加月卡</a></li>
-      <li><a data-hash="#/home" class="menu-link">企业管理</a></li>
-      <li><a data-hash="#/home" class="menu-link">员工管理</a></li>
-      <li><a data-hash="#/home" class="menu-link">数据看板</a></li>
+      <li><a href="#/home" data-hash="#/home" class="menu-link active">工作台</a></li>
+      <li><a href="#/list" data-hash="#/list" class="menu-link">月卡管理</a></li>
+      <li><a href="#/add" data-hash="#/add" class="menu-link">增加月卡</a></li>
+      <li><a href="#/home" data-hash="#/home" class="menu-link">企业管理</a></li>
+      <li><a href="#/home" data-hash="#/home" class="menu-link">员工管理</a></li>
+      <li><a href="#/home" data-hash="#/home" class="menu-link">数据看板</a></li>
     </ul>
   </aside>
 
@@ -505,6 +505,15 @@
       renderHome();
     }
   }
+
+  /* ---------- 5. 导航绑定：左侧菜单与快捷入口 ---------- */
+  // 菜单 <a> 已带 href 可原生跳转，这里再绑一次，确保 hash 路由一定被触发
+  $$('.menu-link').forEach(link => {
+    link.addEventListener('click', () => { location.hash = link.dataset.hash; });
+  });
+  $$('.quick-item').forEach(item => {
+    item.addEventListener('click', () => { location.hash = item.dataset.goto; });
+  });
 
   /* ---------- 5. 工作台 ---------- */
   function renderHome() {
