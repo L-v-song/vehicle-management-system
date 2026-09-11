@@ -2,6 +2,11 @@
 
 原生 HTML + CSS + JavaScript 实现的车辆管理系统，课程实验作业。无框架、无依赖、无构建，单个 HTML 文件即可运行。
 
+## 在线访问
+
+- 演示地址：<https://l-v-song.github.io/vehicle-management-system/>
+- 仓库地址：<https://github.com/L-v-song/vehicle-management-system>
+
 ## 功能
 
 | 模块 | 功能 |
