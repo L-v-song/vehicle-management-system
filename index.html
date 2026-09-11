@@ -119,6 +119,12 @@
   .tip { color: #999; font-size: 12px; padding: 0 20px; }
   .err { color: var(--over); font-size: 12px; min-height: 16px; }
   .foot-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+  /* ===== 轻提示与确认框（不依赖浏览器原生弹窗，兼容受限环境） ===== */
+  .toast { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 9px 18px; border-radius: 4px; font-size: 13px; z-index: 1001; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .confirm-dialog { width: 380px; max-width: 92%; }
+  .confirm-dialog .d-body { padding: 22px 20px; font-size: 14px; color: #444; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -332,6 +338,29 @@
   const PAGE_TITLE = { '#/home': '工作台', '#/list': '月卡管理', '#/add': '增加月卡' };
   const STATUS = { OK: '可用', OVER: '已过期' };
 
+  /* ---------- 存储适配：本地存储不可用时（隐私模式 / 受限 iframe）自动降级为内存 ---------- */
+  const storage = (function () {
+    const memory = {};
+    let ok = false;
+    try {
+      window.localStorage.setItem('__probe__', '1');
+      window.localStorage.removeItem('__probe__');
+      ok = true;
+    } catch (e) { ok = false; }
+    return {
+      get persistent() { return ok; },
+      read(key) {
+        if (ok) { try { return window.localStorage.getItem(key); } catch (e) { /* 降级到内存 */ } }
+        return Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
+      },
+      write(key, value) {
+        memory[key] = value;
+        if (ok) { try { window.localStorage.setItem(key, value); return true; } catch (e) { /* 降级到内存 */ } }
+        return false;
+      }
+    };
+  })();
+
   /* ---------- 2. DOM 与工具 ---------- */
   const $ = id => document.getElementById(id);
   const $$ = sel => document.querySelectorAll(sel);
@@ -368,6 +397,34 @@
     return String(value == null ? '' : value).replace(/[&<>"']/g, ch => map[ch]);
   }
 
+  // 轻提示：不使用 alert，避免在受限环境里被拦截
+  let toastTimer = null;
+  function toast(message) {
+    const box = $('toast');
+    box.textContent = message;
+    box.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { box.classList.remove('show'); }, 2000);
+  }
+
+  // 自定义确认框：不使用 confirm，返回 Promise<boolean>
+  function askConfirm(message) {
+    return new Promise(resolve => {
+      $('confirmText').textContent = message;
+      $('confirmMask').classList.add('show');
+      const finish = result => {
+        $('confirmMask').classList.remove('show');
+        $('confirmOk').removeEventListener('click', onOk);
+        $('confirmCancel').removeEventListener('click', onCancel);
+        resolve(result);
+      };
+      const onOk = () => finish(true);
+      const onCancel = () => finish(false);
+      $('confirmOk').addEventListener('click', onOk);
+      $('confirmCancel').addEventListener('click', onCancel);
+    });
+  }
+
   /* ---------- 3. 数据层 ---------- */
   // 首次打开时的默认模拟数据
   function defaultData() {
@@ -393,7 +450,7 @@
 
   // 读取数据；本机存储没有或损坏时回落到默认数据
   function loadData() {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storage.read(STORAGE_KEY);
     if (!raw) {
       const init = defaultData();
       saveData(init);
@@ -416,13 +473,9 @@
   }
 
   function saveData(list) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-      return true;
-    } catch (e) {
-      alert('数据保存失败，可能是浏览器存储空间已满');
-      return false;
-    }
+    const persisted = storage.write(STORAGE_KEY, JSON.stringify(list));
+    if (!persisted && storage.persistent) toast('数据保存失败，可能是浏览器存储空间已满');
+    return true;
   }
 
   /* ---------- 4. hash 路由 ---------- */
@@ -572,10 +625,11 @@
     $$('.row-check').forEach(cb => { cb.checked = this.checked; });
   });
 
-  $('btnBatchDel').addEventListener('click', () => {
+  $('btnBatchDel').addEventListener('click', async () => {
     const ids = Array.from($$('.row-check:checked')).map(cb => Number(cb.value));
-    if (!ids.length) { alert('请先勾选要删除的月卡'); return; }
-    if (!confirm('确定删除选中的 ' + ids.length + ' 条月卡吗？')) return;
+    if (!ids.length) { toast('请先勾选要删除的月卡'); return; }
+    const yes = await askConfirm('确定删除选中的 ' + ids.length + ' 条月卡吗？');
+    if (!yes) return;
     saveData(loadData().filter(c => ids.indexOf(c.id) < 0));
     renderTable();
   });
@@ -659,15 +713,15 @@
       payType: $('dl_payType').value
     };
     if (!values.ownerName || !values.phone || !values.plate || !values.startDate || !values.endDate || values.amount === '') {
-      alert('请填写完整信息'); return;
+      toast('请填写完整信息'); return;
     }
-    if (!PHONE_REG.test(values.phone)) { alert('手机号格式不正确'); return; }
-    if (!PLATE_REG.test(values.plate)) { alert('车牌格式不正确'); return; }
-    if (values.endDate < values.startDate) { alert('结束日期不能早于开始日期'); return; }
+    if (!PHONE_REG.test(values.phone)) { toast('手机号格式不正确'); return; }
+    if (!PLATE_REG.test(values.plate)) { toast('车牌格式不正确'); return; }
+    if (values.endDate < values.startDate) { toast('结束日期不能早于开始日期'); return; }
 
     const list = loadData();
     const idx = list.findIndex(c => c.id === state.dialogId);
-    if (idx < 0) { alert('未找到对应月卡记录'); return; }
+    if (idx < 0) { toast('未找到对应月卡记录'); return; }
 
     list[idx] = Object.assign({}, list[idx], toCard(values));
     saveData(list);
@@ -691,8 +745,9 @@
     };
   }
 
-  function delOne(card) {
-    if (!confirm('确定删除车主 ' + card.ownerName + '（' + card.plate + '）的月卡吗？')) return;
+  async function delOne(card) {
+    const yes = await askConfirm('确定删除车主 ' + card.ownerName + '（' + card.plate + '）的月卡吗？');
+    if (!yes) return;
     saveData(loadData().filter(c => c.id !== card.id));
     renderTable();
   }
@@ -777,7 +832,7 @@
     else list.push(Object.assign({ id: Date.now() }, toCard(values))); // Date.now() 生成唯一 id
 
     saveData(list);
-    alert('保存成功');
+    toast('保存成功');
     location.hash = '#/list';
   });
 
@@ -788,8 +843,25 @@
 
   window.addEventListener('hashchange', route);
   route();
+  // 存储不可用时提前告知，避免用户以为数据丢了
+  if (!storage.persistent) {
+    setTimeout(() => { toast('当前环境不支持本地保存，数据仅在本次会话内有效'); }, 900);
+  }
 })();
 
 </script>
+<!-- ===== 确认框与轻提示（不依赖浏览器原生弹窗，兼容受限环境） ===== -->
+<div class="mask" id="confirmMask">
+  <div class="dialog confirm-dialog">
+    <div class="d-head"><span>操作确认</span></div>
+    <div class="d-body" id="confirmText"></div>
+    <div class="d-foot">
+      <button class="btn ghost" id="confirmCancel">取消</button>
+      <button class="btn" id="confirmOk">确定</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
 </body>
 </html>
