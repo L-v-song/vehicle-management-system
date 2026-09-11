@@ -1,6 +1,6 @@
-# 园区后台管理系统
+# 车辆管理系统
 
-原生 HTML + CSS + JavaScript 实现的园区后台管理系统，课程实验作业。无框架、无依赖、无构建，单个 HTML 文件即可运行。
+原生 HTML + CSS + JavaScript 实现的车辆管理系统，课程实验作业。无框架、无依赖、无构建，单个 HTML 文件即可运行。
 
 ## 功能
 
@@ -24,7 +24,7 @@
 ## 目录结构
 
 ```
-park-admin-system/
+vehicle-management-system/
 ├── index.html    # 全部源码（HTML + CSS + JavaScript 内联）
 └── README.md
 ```
@@ -40,12 +40,12 @@ python -m http.server 8000
 
 ## 部署到 GitHub Pages
 
-1. 在 GitHub 上新建一个公开仓库，例如 `park-admin-system`（不要勾选初始化 README）
+1. 在 GitHub 上新建一个公开仓库，例如 `vehicle-management-system`（不要勾选初始化 README）
 
 2. 本地关联远程仓库并推送：
 
 ```bash
-git remote add origin https://github.com/<你的用户名>/park-admin-system.git
+git remote add origin https://github.com/<你的用户名>/vehicle-management-system.git
 git branch -M main
 git push -u origin main
 ```
@@ -59,7 +59,7 @@ git push -u origin main
 4. 访问地址：
 
 ```
-https://<你的用户名>.github.io/park-admin-system/
+https://<你的用户名>.github.io/vehicle-management-system/
 ```
 
 ## 说明
