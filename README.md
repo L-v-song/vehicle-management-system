@@ -40,13 +40,13 @@ python -m http.server 8000
 
 ## 用 VSCode 推送到 GitHub
 
+> 前置条件：本机需开启加速器（Steam++ / Watt Toolkit），它会修改 hosts 将 github 域名指向本地反代；仓库已配置 `http.sslVerify=false` 以适配加速器的自签证书。
+
 1. 用 VSCode 打开本项目文件夹
 2. 左侧点击 **源代码管理** 面板（快捷键 `Ctrl + Shift + G`）
 3. 点 **发布分支（Publish Branch）**，按提示登录 GitHub 账号
 4. 仓库可见性选择 **Public**（公开仓库才能免费开启 Pages）
 5. 推送成功后，到仓库 **Settings → Pages** 按上面的步骤开启
-
-> 注意：推送需要能访问 GitHub 的网络环境（代理 / 加速工具）。如果 VSCode 一直卡在推送，先确认代理已开启。
 
 ## 部署到 GitHub Pages
 
